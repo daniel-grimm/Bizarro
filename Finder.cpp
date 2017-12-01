@@ -38,7 +38,7 @@ vector<Mat>& loadTemplateImages(vector<Mat>& vector)
 		templateName += ".jpg";
 
 		//Read in the image
-		Mat templateImage = imread(templateName, CV_LOAD_IMAGE_GRAYSCALE);
+		Mat templateImage = imread(templateName, CV_LOAD_IMAGE_COLOR);
 
 		//add the image to the vector
 		vector.push_back(templateImage);
@@ -57,7 +57,7 @@ Postconditions: The image database is returned in a vector<Mat>&.
 vector<Mat>& loadInputImages(vector<Mat>& vector)
 {
 	//For the number of images in the database
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < 2; i++)
 	{
 		//Read Image into a Mat object
 		string imageName = "comic" + to_string(i) + ".jpg";
@@ -102,7 +102,7 @@ Postconditions:
 */
 void drawGreenBox(Mat& inputImage, const Mat& templateImage, const Point& point, const string name)
 {
-	rectangle(inputImage, point, Point(point.x + templateImage.cols, point.y + templateImage.rows), Scalar(0, 255, 127), 3);
+	rectangle(inputImage, point, Point(point.x + templateImage.cols, point.y + templateImage.rows), Scalar(0, 255, 127), 2);
 	imwrite(name, inputImage);
 }
 
@@ -116,14 +116,6 @@ Postconditions: The number of times the template appears in the image is returne
 @return PointVal&: The point and value of the best match of the template in the image.*/
 PointVal& slideTemplateOverImage(Mat& inputImage, Mat& templateImage, PointVal& bestMatch)
 {
-	//blur it up
-	GaussianBlur(templateImage, templateImage, Size(5, 5), 2.0, 2.0);
-
-	//Sobel ouptput images
-	Mat templateSobel;
-
-	//Sobel it up
-	Sobel(templateImage, templateSobel, CV_8U, 1, 0);
 
 	//Create the result matrix
 	int resultRows = inputImage.rows - templateImage.rows + 1;
@@ -131,7 +123,7 @@ PointVal& slideTemplateOverImage(Mat& inputImage, Mat& templateImage, PointVal& 
 	Mat result(resultRows, resultCols, CV_8UC1);
 
 	//Match the template to the image
-	matchTemplate(inputImage, templateSobel, result, CV_TM_CCOEFF_NORMED);
+	matchTemplate(inputImage, templateImage, result, CV_TM_CCOEFF_NORMED);
 
 	//Get the minimumLocation of the result matrix
 	double minimum, maximum;
@@ -150,6 +142,27 @@ PointVal& slideTemplateOverImage(Mat& inputImage, Mat& templateImage, PointVal& 
 	return bestMatch;//return the best match of the template to the image
 }
 
+Mat findEdges(Mat& image) {
+
+	Mat img = image.clone();
+
+	imshow("img", img);
+	waitKey(0);
+
+	//create grey image
+	cvtColor(img, img, COLOR_BGR2GRAY);
+
+	//blur it up
+	GaussianBlur(img, img, Size(5, 5), 2.0, 2.0);
+
+	//Sobel it up
+	Sobel(img, img, CV_8U, 1, 0);
+
+	return img;
+
+}
+
+
 /*Preconditions: Non-null values for the input image and template image are passed
 in. The input image is assumed to be of the same dimensions or larger than the 
 template image.
@@ -164,19 +177,8 @@ and rotations is returned.
 @return vector<vector<int>> : Each image and the templates that have been found in it.*/
 vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, PointVal& bestMatch, vector< vector<int> >& templatesInImage, int templateNumber, const string name)
 {
-	Mat image = inputImage.clone();//
-
-	//create grey image
-	cvtColor(image, image, COLOR_BGR2GRAY);
-
-	//blur it up
-	GaussianBlur(image, image, Size(5, 5), 2.0, 2.0);
-
-	//Sobel ouptput images
-	Mat imageSobel;
-
-	//Sobel it up
-	Sobel(image, imageSobel, CV_8U, 1, 0);
+	Mat image = findEdges(inputImage);
+	Mat temp = findEdges(templateImage);
 
 	//initialize an empty pointval
 	PointVal test(Point(0, 0), DBL_MAX);
@@ -188,7 +190,7 @@ vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, Poin
 		for (int j = 0; j < 8; j++)
 		{
 			//Find the best match of the template in the image
-			test = slideTemplateOverImage(image, templateImage, bestMatch);
+			test = slideTemplateOverImage(image, temp, bestMatch);
 
 			//If the best match for this template is better than the previous one,
 			//update the best match
@@ -198,11 +200,11 @@ vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, Poin
 			}
 
 			//Rotate the image
-			templateImage = changeTemplateRotation(templateImage);
+			temp = changeTemplateRotation(temp);
 		}
 
 		//Scale the image
-		templateImage = changeTemplateScale(templateImage);
+		temp = changeTemplateScale(temp);
 	}
 
 	drawGreenBox(inputImage, templateImage, bestMatch.point, name);
