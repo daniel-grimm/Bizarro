@@ -164,7 +164,7 @@ and rotations is returned.
 @return vector<vector<int>> : Each image and the templates that have been found in it.*/
 vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, PointVal& bestMatch, vector< vector<int> >& templatesInImage, int templateNumber, const string name)
 {
-	Mat image = inputImage.clone();
+	Mat image = inputImage.clone();//
 
 	//create grey image
 	cvtColor(image, image, COLOR_BGR2GRAY);
