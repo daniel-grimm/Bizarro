@@ -100,9 +100,12 @@ Mat& changeTemplateRotation(Mat& templateImage)
 /*Preconditions:
 Postconditions:
 */
-void drawGreenBox(Mat& inputImage, const Mat& templateImage, const Point& point, const string name)
+void drawGreenBox(Mat& inputImage, const PointVal& pv, const string name)
 {
-	rectangle(inputImage, point, Point(point.x + templateImage.cols, point.y + templateImage.rows), Scalar(0, 255, 127), 2);
+	Point point = pv.point;
+	Size size = pv.size;
+
+	rectangle(inputImage, point, Point(point.x + size.width, point.y + size.height), Scalar(0, 255, 127), 2);
 	imwrite(name, inputImage);
 }
 
@@ -131,12 +134,13 @@ PointVal& slideTemplateOverImage(Mat& inputImage, Mat& templateImage, PointVal& 
 	minMaxLoc(result, &minimum, &maximum, &minLocation, &maxLocation, Mat());
 
 	//Retrieve the Point and Value of the minimum location
-	PointVal testPoint(maxLocation, maximum);
+	PointVal testPoint(maxLocation, maximum, Size(templateImage.cols, templateImage.rows));
 
 	//If a better match is found, update the new point
 	if (bestMatch > testPoint)
 	{
 		cout << "updating best match from " << bestMatch.doubleVal << " to " << testPoint.doubleVal << endl;
+		cout << "template size: " << templateImage.size << endl;
 		bestMatch = testPoint;
 	}
 
@@ -179,7 +183,7 @@ vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, Poin
 	Mat temp = findEdges(templateImage);
 
 	//initialize an empty pointval
-	PointVal test(Point(0, 0), DBL_MAX);
+	PointVal test(Point(0, 0), DBL_MAX, Size(0, 0));
 
 	//For the number of possible template scales
 	for (int i = 0; i < 4; i++)
@@ -208,7 +212,7 @@ vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, Poin
 		temp = changeTemplateScale(temp);
 	}
 
-	drawGreenBox(inputImage, templateImage, bestMatch.point, name);
+	drawGreenBox(inputImage, bestMatch, name);
 	cout << "Point: " << bestMatch.point << " Value: " << bestMatch.doubleVal << endl;
 
 	//Add the best match to the vector
@@ -301,12 +305,12 @@ int main(int argc, char * argv[])
 		for (int j = 0; j < templates.size(); j++)
 		{
 			//initialize an empty PointVal object
-			PointVal bestMatch(Point(0, 0), DBL_MAX);
+			PointVal bestMatch(Point(0, 0), DBL_MAX, Size(0, 0));
 
 			//Number of templates in the image
 			string name = "output" + to_string(i) + ".jpg";
 			Mat templateParam = templates[j].clone();
-			PointVal pv(Point(0,0), 0.0);
+			PointVal pv(Point(0,0), 0.0, Size(0, 0));
 			templatesInImage = templateInImage(inputImages[i], templateParam, bestMatch, templatesInImage, j, name, pv);
 			resultPointVals.push_back(pv);
 		}

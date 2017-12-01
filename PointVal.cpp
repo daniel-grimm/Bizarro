@@ -23,10 +23,11 @@ struct PointVal
 	with the specified Point object and double value.
 	@param p : An OpenCV Point object.
 	@param d : A double value.*/
-	PointVal(Point p, double d)
+	PointVal(Point p, double d, Size s)
 	{
 		point = p;
 		doubleVal = d;
+		size = s;
 	}
 
 	/*Preconditions: A non-null PointVal object is passed in
@@ -70,6 +71,7 @@ struct PointVal
 
 	//Global variables
 	Point point;	//point in space
+	Size size;		//size of the image
 	double doubleVal;	//integer value
 
 };
