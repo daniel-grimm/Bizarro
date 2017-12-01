@@ -126,7 +126,7 @@ PointVal& slideTemplateOverImage(Mat& inputImage, Mat& templateImage, PointVal& 
 	Mat result(resultRows, resultCols, CV_8UC1);
 
 	//Match the template to the image
-	matchTemplate(inputImage, templateImage, result, CV_TM_CCOEFF_NORMED);
+	matchTemplate(inputImage, templateImage, result, TM_CCORR_NORMED);
 
 	//Get the minimumLocation of the result matrix
 	double minimum, maximum;
@@ -134,7 +134,7 @@ PointVal& slideTemplateOverImage(Mat& inputImage, Mat& templateImage, PointVal& 
 	minMaxLoc(result, &minimum, &maximum, &minLocation, &maxLocation, Mat());
 
 	//Retrieve the Point and Value of the minimum location
-	PointVal testPoint(maxLocation, maximum, Size(templateImage.cols, templateImage.rows));
+	PointVal testPoint(minLocation, minimum, Size(templateImage.cols, templateImage.rows));
 
 	//If a better match is found, update the new point
 	if (bestMatch > testPoint)
@@ -182,6 +182,8 @@ vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, Poin
 	Mat image = findEdges(inputImage);
 	Mat temp = findEdges(templateImage);
 
+	imwrite("edgeimage.jpg", image);
+
 	//initialize an empty pointval
 	PointVal test(Point(0, 0), DBL_MAX, Size(0, 0));
 
@@ -194,22 +196,16 @@ vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, Poin
 			//Find the best match of the template in the image
 			test = slideTemplateOverImage(image, temp, bestMatch);
 
-			//If the best match for this template is better than the previous one,
-			//update the best match
-			if (bestMatch > test)
-			{
-				cout << "updating best total match from " << bestMatch.doubleVal << " to " << test.doubleVal << endl;
-				bestMatch = test;
-			}
-
 			//Rotate the image
 			temp = changeTemplateRotation(temp);
 
-			imwrite(to_string(i) + "_" + to_string(j) + "template_" + to_string(templateNumber) + ".jpg", temp);
+			imwrite("template_" + to_string(templateNumber) + "_" + to_string(i) + "_" + to_string(j) + ".jpg", temp);
 		}
 
 		//Scale the image
+		cout << "old size: " << temp.size << endl;
 		temp = changeTemplateScale(temp);
+		cout << "new size: " << temp.size << endl;
 	}
 
 	drawGreenBox(inputImage, bestMatch, name);
