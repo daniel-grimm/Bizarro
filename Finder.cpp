@@ -218,10 +218,12 @@ vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, Poin
 	return templatesInImage;
 }
 
-/*Preconditions:
-Postconditions:
-@param
-@return*/
+/*Preconditions: An empty vector<string> is passed into the method which
+will contain the name of all the templates
+Postconditions: The names of all the template images are loaded into the vector
+at each index.
+@param templateNames : An empty vector of strings.
+@return vector<string>& : The list of template names.*/
 vector<string>& loadTemplateNames(vector<string>& templateNames)
 {
 	//open a file to read in the template names
@@ -251,10 +253,12 @@ vector<string>& loadTemplateNames(vector<string>& templateNames)
 	return templateNames;
 }
 
-/*Preconditions:
-Postconditions:
-@param
-@return*/
+/*Preconditions: A data structure describing the name of each template
+image is passed in as a vector<vector<int>>& object.
+Postconditions: The results of the template matching to the image are printed to a text file.
+@param vectorOfMatchedTemplates : For each image, the name of the template image as descriged by
+an integer index.
+@return void*/
 void printResultsToFile(vector< vector<int> >& vectorOfMatchedTemplates, vector< PointVal >& resultPointVals)
 {
 	vector<string> templateNames;
@@ -297,7 +301,7 @@ int main(int argc, char * argv[])
 		for (int j = 0; j < templates.size(); j++)
 		{
 			//initialize an empty PointVal object
-			PointVal bestMatch(Point(0, 0), DBL_MIN);
+			PointVal bestMatch(Point(0, 0), DBL_MAX);
 
 			//Number of templates in the image
 			string name = "output" + to_string(i) + ".jpg";
