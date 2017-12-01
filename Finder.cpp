@@ -90,7 +90,7 @@ Mat& changeTemplateRotation(Mat& templateImage)
 {
 	//Rotate the template
 	Point2d pictureCenter(templateImage.rows / 2.0, templateImage.cols / 2.0);
-	Mat rotationMatrix = getRotationMatrix2D(pictureCenter, -45, 1.0);
+	Mat rotationMatrix = getRotationMatrix2D(pictureCenter, -90, 1.0);
 	warpAffine(templateImage, templateImage, rotationMatrix, templateImage.size());
 
 	//return the rotated image
@@ -134,8 +134,9 @@ PointVal& slideTemplateOverImage(Mat& inputImage, Mat& templateImage, PointVal& 
 	PointVal testPoint(maxLocation, maximum);
 
 	//If a better match is found, update the new point
-	if (bestMatch < testPoint)
+	if (bestMatch > testPoint)
 	{
+		cout << "updating best match from " << bestMatch.doubleVal << " to " << testPoint.doubleVal << endl;
 		bestMatch = testPoint;
 	}
 
@@ -145,9 +146,6 @@ PointVal& slideTemplateOverImage(Mat& inputImage, Mat& templateImage, PointVal& 
 Mat findEdges(Mat& image) {
 
 	Mat img = image.clone();
-
-	imshow("img", img);
-	waitKey(0);
 
 	//create grey image
 	cvtColor(img, img, COLOR_BGR2GRAY);
@@ -175,7 +173,7 @@ and rotations is returned.
 @param templatesInImage : A vector<vector<int>> that stores the best match for each template for each image.
 @param templateNumber : An int representing which template number this image is on.
 @return vector<vector<int>> : Each image and the templates that have been found in it.*/
-vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, PointVal& bestMatch, vector< vector<int> >& templatesInImage, int templateNumber, const string name)
+vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, PointVal& bestMatch, vector< vector<int> >& templatesInImage, int templateNumber, const string name, PointVal& retPointVal)
 {
 	Mat image = findEdges(inputImage);
 	Mat temp = findEdges(templateImage);
@@ -187,7 +185,7 @@ vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, Poin
 	for (int i = 0; i < 4; i++)
 	{
 		//For the number of possible template rotations
-		for (int j = 0; j < 8; j++)
+		for (int j = 0; j < 4; j++)
 		{
 			//Find the best match of the template in the image
 			test = slideTemplateOverImage(image, temp, bestMatch);
@@ -196,11 +194,14 @@ vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, Poin
 			//update the best match
 			if (bestMatch > test)
 			{
+				cout << "updating best total match from " << bestMatch.doubleVal << " to " << test.doubleVal << endl;
 				bestMatch = test;
 			}
 
 			//Rotate the image
 			temp = changeTemplateRotation(temp);
+
+			imwrite(to_string(i) + "_" + to_string(j) + "template_" + to_string(templateNumber) + ".jpg", temp);
 		}
 
 		//Scale the image
@@ -254,7 +255,7 @@ vector<string>& loadTemplateNames(vector<string>& templateNames)
 Postconditions:
 @param
 @return*/
-void printResultsToFile(vector< vector<int> >& vectorOfMatchedTemplates)
+void printResultsToFile(vector< vector<int> >& vectorOfMatchedTemplates, vector< PointVal >& resultPointVals)
 {
 	vector<string> templateNames;
 	templateNames = loadTemplateNames(templateNames);
@@ -266,7 +267,7 @@ void printResultsToFile(vector< vector<int> >& vectorOfMatchedTemplates)
 		out << "Image comic" << to_string(i) << ".jpg" << ":" << endl;
 		for (int j = 0; j < vectorOfMatchedTemplates[i].size(); j++)
 		{
-			out << templateNames[vectorOfMatchedTemplates[i][j]] << endl;
+			out << templateNames[vectorOfMatchedTemplates[i][j]] << " - matched at: " << resultPointVals[j].point << " with certainty: " << resultPointVals[j].doubleVal << endl;
 		}
 		out << endl;
 	}
@@ -285,6 +286,7 @@ int main(int argc, char * argv[])
 
 	//Keeps track of which templates are in which images
 	vector< vector<int> > templatesInImage;
+	vector<PointVal> resultPointVals;
 
 	//For the number of images in the database
 	for (int i = 0; i < inputImages.size(); i++)
@@ -300,12 +302,16 @@ int main(int argc, char * argv[])
 			//Number of templates in the image
 			string name = "output" + to_string(i) + ".jpg";
 			Mat templateParam = templates[j].clone();
-			templatesInImage = templateInImage(inputImages[i], templateParam, bestMatch, templatesInImage, j, name);
+			PointVal pv(Point(0,0), 0.0);
+			templatesInImage = templateInImage(inputImages[i], templateParam, bestMatch, templatesInImage, j, name, pv);
+			resultPointVals.push_back(pv);
 		}
 	}
 
 	//Print the results of the template search to disk in a text file
-	printResultsToFile(templatesInImage);
+	printResultsToFile(templatesInImage, resultPointVals);
+
+	cin.ignore();
 
 	//Finished Execution
 	return 0;
