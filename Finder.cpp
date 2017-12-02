@@ -30,7 +30,7 @@ vector<Mat>& loadTemplateImages(vector<Mat>& vector)
 	char character = 'a';
 
 	//Read Image into a Mat object
-	for (int i = 0; i < 2; i++)
+	for (int i = 0; i < 1; i++)
 	{
 		//Create the name of the file
 		string templateName;
@@ -44,6 +44,36 @@ vector<Mat>& loadTemplateImages(vector<Mat>& vector)
 		vector.push_back(templateImage);
 
 		//increment the name of the template
+		character = character++;
+	}
+	return vector;
+}
+
+/*Preconditions: An empty vector<Mat>& is passed into the method
+for the purpose of containing all of the template images.
+Postconditions: The template images are returned as a vector<Mat>&.
+@param vector : An empty vector<Mat>& which will contain an array of templates.
+@return vector<Mat>& : The array of templates from the database.*/
+vector<Mat>& loadTemplateMasks(vector<Mat>& vector)
+{
+	//For the number of templates (masks) in the database
+	char character = 'n';
+
+	//Read Image into a Mat object
+	for (int i = 0; i < 1; i++)
+	{
+		//Create the name of the file
+		string templateName;
+		templateName.push_back(character);
+		templateName += ".jpg";
+
+		//Read in the image
+		Mat templateMaskImage = imread(templateName, CV_LOAD_IMAGE_GRAYSCALE);
+
+		//add the image to the vector
+		vector.push_back(templateMaskImage);
+
+		//increment the name of the mask
 		character = character++;
 	}
 	return vector;
@@ -73,10 +103,10 @@ vector<Mat>& loadInputImages(vector<Mat>& vector)
 Postconditions: The same image that was passed in is returned but has been scaled up.
 @param templateImage : The image that is going to be scaled.
 @return Mat& : The original image but larger.*/
-Mat& changeTemplateScale(Mat& templateImage)
+Mat& changeTemplateScale(Mat& templateImage, double scalingFactor)
 {
 	//resize the image
-	resize(templateImage, templateImage, Size(), 0.5, 0.5, INTER_LINEAR);
+	resize(templateImage, templateImage, Size(), scalingFactor, scalingFactor, INTER_LINEAR);
 
 	//return the scaled image
 	return templateImage;
@@ -86,11 +116,11 @@ Mat& changeTemplateScale(Mat& templateImage)
 Postconditions: The same image is returned by has been rotated slightly.
 @param templateImage : The image being rotated.
 @return Mat& : The rotated image.*/
-Mat& changeTemplateRotation(Mat& templateImage)
+Mat& changeTemplateRotation(Mat& templateImage, int degreesOfRotation)
 {
 	//Rotate the template
 	Point2d pictureCenter(templateImage.rows / 2.0, templateImage.cols / 2.0);
-	Mat rotationMatrix = getRotationMatrix2D(pictureCenter, -90, 1.0);
+	Mat rotationMatrix = getRotationMatrix2D(pictureCenter, -degreesOfRotation, 1.0);
 	warpAffine(templateImage, templateImage, rotationMatrix, templateImage.size());
 
 	//return the rotated image
@@ -117,7 +147,7 @@ Postconditions: The number of times the template appears in the image is returne
 @param templateImage : The template that is attempting to be found in the image.
 @param bestMatch : The current best match for the template in the image.
 @return PointVal&: The point and value of the best match of the template in the image.*/
-PointVal& slideTemplateOverImage(Mat& inputImage, Mat& templateImage, PointVal& bestMatch)
+PointVal& slideTemplateOverImage(Mat& inputImage, Mat& templateImage, Mat& templateMask, PointVal& bestMatch, int& timesUnchanged, bool& changed)
 {
 
 	//Create the result matrix
@@ -126,7 +156,7 @@ PointVal& slideTemplateOverImage(Mat& inputImage, Mat& templateImage, PointVal& 
 	Mat result(resultRows, resultCols, CV_8UC1);
 
 	//Match the template to the image
-	matchTemplate(inputImage, templateImage, result, TM_CCORR_NORMED);
+	matchTemplate(inputImage, templateImage, result, CV_TM_CCORR_NORMED, templateMask);
 
 	//Get the minimumLocation of the result matrix
 	double minimum, maximum;
@@ -134,14 +164,15 @@ PointVal& slideTemplateOverImage(Mat& inputImage, Mat& templateImage, PointVal& 
 	minMaxLoc(result, &minimum, &maximum, &minLocation, &maxLocation, Mat());
 
 	//Retrieve the Point and Value of the minimum location
-	PointVal testPoint(minLocation, minimum, Size(templateImage.cols, templateImage.rows));
+	PointVal testPoint(maxLocation, maximum, Size(templateImage.cols, templateImage.rows));
 
 	//If a better match is found, update the new point
-	if (bestMatch > testPoint)
+	if (bestMatch < testPoint)
 	{
 		cout << "updating best match from " << bestMatch.doubleVal << " to " << testPoint.doubleVal << endl;
 		cout << "template size: " << templateImage.size << endl;
 		bestMatch = testPoint;
+		changed = true;
 	}
 
 	return bestMatch;//return the best match of the template to the image
@@ -177,7 +208,7 @@ and rotations is returned.
 @param templatesInImage : A vector<vector<int>> that stores the best match for each template for each image.
 @param templateNumber : An int representing which template number this image is on.
 @return vector<vector<int>> : Each image and the templates that have been found in it.*/
-vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, PointVal& bestMatch, vector< vector<int> >& templatesInImage, int templateNumber, const string name, PointVal& retPointVal)
+vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, Mat& templateMask, PointVal& bestMatch, vector< vector<int> >& templatesInImage, int templateNumber, const string name, PointVal& retPointVal)
 {
 	Mat image = findEdges(inputImage);
 	Mat temp = findEdges(templateImage);
@@ -185,27 +216,54 @@ vector< vector<int> >& templateInImage(Mat& inputImage, Mat& templateImage, Poin
 	imwrite("edgeimage.jpg", image);
 
 	//initialize an empty pointval
-	PointVal test(Point(0, 0), DBL_MAX, Size(0, 0));
+	PointVal test(Point(0, 0), DBL_MIN, Size(0, 0));
+
+	int timesUnchanged = 0;
+	bool changed;
+	bool stop = false;
+
+	const int max_iterations = 31;
+	const double scalingFactor = 0.95;
+	const int degreesOfRotation = 90;
 
 	//For the number of possible template scales
-	for (int i = 0; i < 4; i++)
+	for (int i = 0; i < max_iterations; i++)
 	{
+
+		changed = false;
+
 		//For the number of possible template rotations
-		for (int j = 0; j < 4; j++)
+		for (int j = 0; j < 360 / degreesOfRotation; j++)
 		{
 			//Find the best match of the template in the image
-			test = slideTemplateOverImage(image, temp, bestMatch);
+			test = slideTemplateOverImage(image, temp, templateMask, bestMatch, timesUnchanged, changed);
 
 			//Rotate the image
-			temp = changeTemplateRotation(temp);
+			temp = changeTemplateRotation(temp, degreesOfRotation);
+			templateMask = changeTemplateRotation(templateMask, degreesOfRotation);
 
 			imwrite("template_" + to_string(templateNumber) + "_" + to_string(i) + "_" + to_string(j) + ".jpg", temp);
 		}
 
+		if (changed) 
+		{
+			timesUnchanged = 0;
+		}
+		else
+		{
+			timesUnchanged++;
+		}
+
+
+		if (timesUnchanged == int(max_iterations / ceil(scalingFactor * 3))) 
+		{
+			break;
+		}
+
 		//Scale the image
-		cout << "old size: " << temp.size << endl;
-		temp = changeTemplateScale(temp);
-		cout << "new size: " << temp.size << endl;
+		temp = changeTemplateScale(temp, scalingFactor);
+		templateMask = changeTemplateScale(templateMask, scalingFactor);
+
 	}
 
 	drawGreenBox(inputImage, bestMatch, name);
@@ -286,6 +344,7 @@ int main(int argc, char * argv[])
 {
 	//Load the images from disk
 	vector<Mat> templates = loadTemplateImages(vector<Mat>());
+	vector<Mat> masks = loadTemplateMasks(vector<Mat>());
 	vector<Mat> inputImages = loadInputImages(vector<Mat>());
 
 	//Keeps track of which templates are in which images
@@ -301,13 +360,14 @@ int main(int argc, char * argv[])
 		for (int j = 0; j < templates.size(); j++)
 		{
 			//initialize an empty PointVal object
-			PointVal bestMatch(Point(0, 0), DBL_MAX, Size(0, 0));
+			PointVal bestMatch(Point(0, 0), DBL_MIN, Size(0, 0));
 
 			//Number of templates in the image
 			string name = "output" + to_string(i) + ".jpg";
 			Mat templateParam = templates[j].clone();
+			Mat maskParam = masks[j].clone();
 			PointVal pv(Point(0,0), 0.0, Size(0, 0));
-			templatesInImage = templateInImage(inputImages[i], templateParam, bestMatch, templatesInImage, j, name, pv);
+			templatesInImage = templateInImage(inputImages[i], templateParam, maskParam, bestMatch, templatesInImage, j, name, pv);
 			resultPointVals.push_back(pv);
 		}
 	}
